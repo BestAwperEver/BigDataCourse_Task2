@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "ru.spbu.pt.bd.grpc";
+option java_outer_classname = "SampleServiceProto";
+
+service SampleService {
+    rpc getSystemInfo(InfoRequest) returns (InfoResponse) {}
+    rpc getFactorization(InfoRequest) returns (FactorResponse) {}
+}
+
+
+message InfoRequest {
+    string printMe = 1;
+}
+
+message InfoResponse {
+    string systemName = 1;
+    string time = 2;
+}
+
+message FactorRequest {
+    int64 number = 1;
+}
+
+message FactorResponse {
+    string formattedFactorized = 1;
+}
