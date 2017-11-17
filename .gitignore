@@ -1,4 +1,5 @@
 Java.gitignore
+JetBrains.gitignore
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

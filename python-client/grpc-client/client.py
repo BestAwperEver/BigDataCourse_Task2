@@ -4,48 +4,50 @@ from queue import Queue
 import grpc
 
 import simple_pb2_grpc
-# import simple_pb2
+import simple_pb2
 
-THREADS_NUMBER = 2
+THREADS_NUMBER = 10
 NUMBERS_QUEUE = Queue()
 END_OF_SEQUENCE = -2
 WRITE_QUEUE = Queue()  # thread-safe
 
 
-def thread_writer(path):
-    outFile = open(path, 'w')
-    while True:
-        line = ''
-        while WRITE_QUEUE.qsize():
+def thread_writer():
+    with open(path, 'w') as outfile:
+        while True:
             line = WRITE_QUEUE.get()
+            print(line)
             if line == 'end':
                 break
-            outFile.write(WRITE_QUEUE.get())
-        if line == 'end':
-            break
-    outFile.flush()
-    outFile.close()
+            outfile.write(line+'\n')
+            WRITE_QUEUE.task_done()
+        outfile.flush()
+        outfile.close()
 
 
-def thread_worker(stub):
+def thread_worker():
     while True:
-        if NUMBERS_QUEUE.not_empty():
+        if NUMBERS_QUEUE.not_empty:
             nextInt = NUMBERS_QUEUE.get()
             if nextInt == END_OF_SEQUENCE:
                 break
-            WRITE_QUEUE.put(stub.getFactorization(nextInt))  # returns a string
+            request = simple_pb2.FactorRequest(number=nextInt)
+            res = stub.getFactorization(request).formattedFactorized
+            NUMBERS_QUEUE.task_done()
+            WRITE_QUEUE.put(res)  # returns a string
 
 
 if __name__ == '__main__':
     channel = grpc.insecure_channel('localhost:5757')
     stub = simple_pb2_grpc.SampleServiceStub(channel)
+    path = 'out.txt'
 
-    writer = threading.Thread(target=thread_writer, args='out.txt')
+    writer = threading.Thread(target=thread_writer)
 
     workers = []
 
     for i in range(THREADS_NUMBER):
-        workers.append(threading.Thread(target=thread_worker, args=stub))
+        workers.append(threading.Thread(target=thread_worker))
 
     writer.start()
 
@@ -59,10 +61,15 @@ if __name__ == '__main__':
             NUMBERS_QUEUE.put(int(line))
             line = f.readline()
 
-    WRITE_QUEUE.put('end')
+    NUMBERS_QUEUE.join()
+
     for i in range(THREADS_NUMBER):
         NUMBERS_QUEUE.put(END_OF_SEQUENCE)
-    
-    writer.join()
+
     for worker in workers:
         worker.join()
+
+    WRITE_QUEUE.join()
+
+    WRITE_QUEUE.put('end')
+    writer.join()
